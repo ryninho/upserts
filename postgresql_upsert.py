@@ -1,3 +1,5 @@
+# slightly modified from fork of https://gist.github.com/dound/772171
+
 def upsert(db_cur, table, pk_fields, schema=None, **kwargs):
     """Updates the specified relation with the key-value pairs in kwargs if a
     row matching the primary key value(s) already exists.  Otherwise, a new row
@@ -20,13 +22,17 @@ def upsert(db_cur, table, pk_fields, schema=None, **kwargs):
     db_cur.execute("SELECT COUNT(*) FROM %s WHERE %s LIMIT 1" % (rel, where), where_args)
     fields = [f for f in kwargs.keys()]
     if db_cur.fetchone()[0] > 0:
-        set_clause = ', '.join('%s=%%s' % f for f in fields if f not in pk_fields)
-        set_args = [kwargs[f] for f in fields if f not in pk_fields]
+        # do NOT update created_at
+        set_clause = ', '.join('%s=%%s' % f for f in fields if f not in pk_fields and f != 'created_at')
+        set_args = [kwargs[f] for f in fields if f not in pk_fields and f != 'created_at']
+        print("UPDATE %s SET %s WHERE %s" % (rel, set_clause, where), set_args+where_args)
         db_cur.execute("UPDATE %s SET %s WHERE %s" % (rel, set_clause, where), set_args+where_args)
         return False
     else:
         field_placeholders = ['%s'] * len(fields)
         fmt_args = (rel, ','.join(fields), ','.join(field_placeholders))
         insert_args = [kwargs[f] for f in fields]
+        print("INSERT INTO %s (%s) VALUES (%s)" % fmt_args, insert_args)
         db_cur.execute("INSERT INTO %s (%s) VALUES (%s)" % fmt_args, insert_args)
         return True
+
